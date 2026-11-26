@@ -470,5 +470,63 @@
 })();
 </script>
 
+<!-- Snap Pixel: يعمل فقط في دول الخليج المحددة، ويحترم GPC وزر إيقاف التتبع -->
+<script>
+(function(){
+  var PIXEL_ID='a6fc994c-2dc4-42d1-850a-f7e6b76240ab';
+  var ALLOWED=['SA','AE','BH','KW','OM','QA'];
+  var OPTOUT_KEY='alsafwa_ads_optout';
+  // للاختبار من خارج الخليج: افتح الصفحة مع ?snap_test=1
+  var TEST=/[?&]snap_test=1\b/.test(location.search);
+  var countryOK=false, loaded=false;
+
+  function optedOut(){try{return localStorage.getItem(OPTOUT_KEY)==='1'}catch(e){return false}}
+  function gpc(){return navigator.globalPrivacyControl===true}
+  function allowed(){return countryOK && !optedOut() && !gpc()}
+
+  function load(){
+    if(loaded) return; loaded=true;
+    (function(e,t,n){if(e.snaptr)return;var a=e.snaptr=function()
+    {a.handleRequest?a.handleRequest.apply(a,arguments):a.queue.push(arguments)};
+    a.queue=[];var s='script';var r=t.createElement(s);r.async=!0;
+    r.src=n;var u=t.getElementsByTagName(s)[0];
+    u.parentNode.insertBefore(r,u);})(window,document,'https://sc-static.net/scevent.min.js');
+    snaptr('init',PIXEL_ID,{});
+  }
+
+  function track(ev,params){
+    if(!allowed()) return;   // الأحداث الممنوعة لا تُحفظ ولا تُرسل لاحقًا
+    load();
+    snaptr('track',ev,params||{});
+  }
+
+  // تحديد الدولة من Cloudflare، وإن تعذّر التحديد يبقى التتبع متوقفًا
+  function start(){ track('PAGE_VIEW'); }
+  if(TEST){ countryOK=true; start(); }
+  else if(window.fetch){
+    fetch('/cdn-cgi/trace',{cache:'no-store'})
+      .then(function(r){return r.ok?r.text():''})
+      .then(function(t){
+        var m=t.match(/^loc=([A-Z]{2})$/m);
+        countryOK=!!(m && ALLOWED.indexOf(m[1])>-1);
+        start();
+      })
+      .catch(function(){});
+  }
+
+  // ضغطات الاتصال والواتساب (كل زر حدث مستقل)
+  document.addEventListener('click',function(e){
+    var a=e.target.closest && e.target.closest('a[href]');
+    if(!a) return;
+    var href=a.getAttribute('href')||'';
+    if(href.indexOf('tel:')===0){
+      track('SIGN_UP',{sign_up_method:'call'});
+    }else if(href.indexOf('wa.me')>-1 || href.indexOf('whatsapp')>-1){
+      track('SIGN_UP',{sign_up_method:'whatsapp'});
+    }
+  },true);
+})();
+</script>
+
 </body>
 </html>
